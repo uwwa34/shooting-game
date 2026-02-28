@@ -115,17 +115,17 @@ class Boss {
     ctx.drawImage(this._canvas, this.x, this.y, this.w, this.h);
     ctx.restore();
 
-    // rage warning aura
-    if (this._rage) {
-      ctx.save();
-      const pulse = 0.5 + 0.5*Math.sin(Date.now()*0.008);
-      ctx.strokeStyle = `rgba(255,40,40,${0.5*pulse})`;
-      ctx.lineWidth   = 6;
-      ctx.shadowColor = 'rgba(255,0,0,0.8)';
-      ctx.shadowBlur  = 20;
-      ctx.strokeRect(this.x-4, this.y-4, this.w+8, this.h+8);
-      ctx.restore();
-    }
+    // // rage warning aura
+    // if (this._rage) {
+    //   ctx.save();
+    //   const pulse = 0.5 + 0.5*Math.sin(Date.now()*0.008);
+    //   ctx.strokeStyle = `rgba(255,40,40,${0.5*pulse})`;
+    //   ctx.lineWidth   = 6;
+    //   ctx.shadowColor = 'rgba(255,0,0,0.8)';
+    //   ctx.shadowBlur  = 20;
+    //   ctx.strokeRect(this.x-4, this.y-4, this.w+8, this.h+8);
+    //   ctx.restore();
+    // }
   }
 
   getRect() { return { x:this.x, y:this.y, w:this.w, h:this.h }; }

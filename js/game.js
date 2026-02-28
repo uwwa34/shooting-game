@@ -365,7 +365,7 @@ class Game {
     else if(this.state===STATE.PLAYING)    {
       this.spawnTimer++;
       if(this.spawnTimer>=60){ this.enemies.push(new Enemy(this.images)); this.spawnTimer=0; }
-      if(this.killed>=30){ this.state=STATE.BOSS_FIGHT; this._addBossScene(); }
+      if(this.killed>=10){ this.state=STATE.BOSS_FIGHT; this._addBossScene(); }
       this.player.update(this.keys);
     }
     else if(this.state===STATE.BOSS_FIGHT){
@@ -520,39 +520,69 @@ class Game {
   }
 
   _drawVictory(){
-    const ctx=this.ctx;
-    const midY = HUD_H + GAME_H/2;
+    const ctx = this.ctx;
+    const midY = HUD_H + GAME_H / 2;
 
-    ctx.fillStyle=COL.CYAN; ctx.font='bold 32px Arial';
-    ctx.textAlign='center'; ctx.textBaseline='middle';
-    ctx.fillText('RESCUE SUCCESS!', WIDTH/2, midY - 80);
+    // ── dark panel ──
+    ctx.fillStyle = 'rgba(0,0,0,0.75)';
+    ctx.beginPath();
+    ctx.roundRect(20, midY - 115, WIDTH - 40, 265, 14);
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(0,220,240,0.35)';
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
 
-    // bonus breakdown (แสดงหลังเจอเพื่อน)
+    ctx.textAlign    = 'center';
+    ctx.textBaseline = 'middle';
+
+    // ── Title ──
+    ctx.shadowColor = 'rgba(0,220,240,0.9)'; ctx.shadowBlur = 14;
+    ctx.fillStyle   = COL.CYAN; ctx.font = 'bold 28px Arial';
+    ctx.fillText('RESCUE SUCCESS!', WIDTH/2, midY - 82);
+    ctx.shadowBlur = 0;
+
+    // ── Bonus rows ──
     if (this.reachedFriend && this.bonusBreakdown) {
       const b = this.bonusBreakdown;
+
+      // divider บน
+      ctx.strokeStyle='rgba(255,255,255,0.15)'; ctx.lineWidth=1;
+      ctx.beginPath(); ctx.moveTo(40,midY-54); ctx.lineTo(WIDTH-40,midY-54); ctx.stroke();
+
       const rows = [
-        { label: `⏱ Time  (${b.secElapsed}s)`, val: b.timeBonus,  col: 'rgb(100,220,255)' },
-        { label: `❤ HP Bonus`,                  val: b.hpBonus,   col: 'rgb(220,80,80)'   },
-        { label: `★ SPECIAL Bonus`,              val: b.spBonus,   col: 'rgb(255,160,40)'  },
-        { label: `TOTAL BONUS`,                  val: b.totalBonus, col: COL.YELLOW         },
+        { label:`TIME  (${b.secElapsed}s)`, val:b.timeBonus,  col:'rgb(100,220,255)' },
+        { label:`HP BONUS`,                  val:b.hpBonus,   col:'rgb(255,110,110)' },
+        { label:`SPECIAL BONUS`,             val:b.spBonus,   col:'rgb(255,185,60)'  },
       ];
       rows.forEach((r, i) => {
-        const y = midY - 40 + i * 32;
-        ctx.font      = i===3 ? 'bold 20px Courier New' : '17px Courier New';
+        const y = midY - 30 + i * 34;
+        // label
+        ctx.fillStyle = 'rgba(255,255,255,0.65)';
+        ctx.font = '14px Courier New'; ctx.textAlign = 'left';
+        ctx.fillText(r.label, 44, y);
+        // value
         ctx.fillStyle = r.col;
-        ctx.textAlign = 'left';
-        ctx.fillText(r.label, WIDTH/2 - 130, y);
-        ctx.textAlign = 'right';
-        ctx.fillText(`+${String(r.val).padStart(5,'0')}`, WIDTH/2 + 130, y);
+        ctx.font = 'bold 16px Courier New'; ctx.textAlign = 'right';
+        ctx.fillText(`+${String(r.val).padStart(5,'0')}`, WIDTH-44, y);
       });
-      // divider
-      ctx.strokeStyle='rgba(255,255,255,0.15)'; ctx.lineWidth=1;
-      ctx.beginPath(); ctx.moveTo(WIDTH/2-130, midY+76); ctx.lineTo(WIDTH/2+130, midY+76); ctx.stroke();
+
+      // divider ล่าง
+      ctx.strokeStyle='rgba(255,255,255,0.25)'; ctx.lineWidth=1;
+      ctx.beginPath(); ctx.moveTo(40,midY+74); ctx.lineTo(WIDTH-40,midY+74); ctx.stroke();
+
+      // TOTAL
+      ctx.shadowColor='rgba(255,230,0,0.8)'; ctx.shadowBlur=10;
+      ctx.fillStyle='rgba(255,255,255,0.6)'; ctx.font='bold 14px Courier New'; ctx.textAlign='left';
+      ctx.fillText('TOTAL BONUS', 44, midY+92);
+      ctx.fillStyle=COL.YELLOW; ctx.font='bold 22px Courier New'; ctx.textAlign='right';
+      ctx.fillText(`+${String(b.totalBonus).padStart(5,'0')}`, WIDTH-44, midY+92);
+      ctx.shadowBlur=0;
     }
 
-    if(this.victoryCanExit){
-      ctx.fillStyle='#fff'; ctx.font='18px Arial'; ctx.textAlign='center';
-      ctx.fillText('Tap SHOOT for Ranking', WIDTH/2, midY+120);
+    // ── Tap hint ──
+    if (this.victoryCanExit) {
+      ctx.fillStyle='rgba(255,255,255,0.8)'; ctx.font='16px Arial'; ctx.textAlign='center';
+      ctx.fillText('Tap SHOOT for Ranking', WIDTH/2, midY+130);
     }
   }
 

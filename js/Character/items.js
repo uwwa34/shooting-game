@@ -6,6 +6,8 @@
 // ใช้ image sprite แทนสี่เหลี่ยมสีเหลือง
 // images.bullet ต้องโหลดก่อน; ถ้าไม่มีจะ fallback เป็นเส้นสีเหลือง
 let _bulletCanvas = null;   // shared offscreen canvas (process once)
+const W_Bullet    = 40;
+const H_Bullet    = 40;
 
 function getBulletCanvas(images) {
   if (_bulletCanvas) return _bulletCanvas;
@@ -19,14 +21,14 @@ class Bullet {
   constructor(x, y, vx, vy, images) {
     this.x  = x; this.y = y;
     this.vx = vx; this.vy = vy;
-    this.w  = 10; this.h = 22;
+    this.w  = W_Bullet; this.h = H_Bullet;
     this.alive = true;
     this._bc = getBulletCanvas(images);
     // rotation angle จาก velocity (ตรง = 0, เอียงตาม vx/vy)
     this._angle = Math.atan2(vy, vx) + Math.PI / 2;  // +90° เพราะ sprite หันขึ้น
   }
 
-  get cx() { return this.x + this.w / 2; }
+  get cx() { return this.x + (this.w / 2) - (W_Bullet/2); }  //this.w / 2
   get cy() { return this.y + this.h / 2; }
 
   update() {

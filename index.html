@@ -166,14 +166,21 @@
     document.getElementById('loading').style.display = 'none';
     const canvas = document.getElementById('gameCanvas');
 
-    // unlock audio context on first interaction (iOS requirement)
+    // iOS: resume AudioContext และ BGM pending ทันทีที่ user แตะครั้งแรก
     function unlockAudio() {
-      if (sounds.bgm) sounds.bgm.play().then(() => sounds.bgm.pause()).catch(() => {});
-      document.removeEventListener('touchstart', unlockAudio);
-      document.removeEventListener('mousedown',  unlockAudio);
+      // resume Web Audio API context ถ้ามี
+      if (window.AudioContext || window.webkitAudioContext) {
+        const AC = window.AudioContext || window.webkitAudioContext;
+        if (!unlockAudio._ctx) {
+          unlockAudio._ctx = new AC();
+          unlockAudio._ctx.resume().catch(() => {});
+        }
+      }
+      // resume BGM ถ้า pending
+      if (game && game._resumeBGMIfPending) game._resumeBGMIfPending();
     }
-    document.addEventListener('touchstart', unlockAudio, { once: true });
-    document.addEventListener('mousedown',  unlockAudio, { once: true });
+    document.addEventListener('touchstart', unlockAudio, { passive: true });
+    document.addEventListener('mousedown',  unlockAudio);
 
     const game = new Game(canvas, images, sounds);
     game.start();

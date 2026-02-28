@@ -451,7 +451,7 @@ class Game {
 
     ctx.fillStyle=COL.YELLOW; ctx.font='bold 13px Courier New';
     ctx.textAlign='center';
-    ctx.fillText(String(this.player.score).padStart(6,'0'), WIDTH/2, 18);
+    ctx.fillText(String(this.player.score).padStart(6,'0'), WIDTH/2.165, 18); //WIDTH/2, 18);
 
     // Weapon pips
     ctx.fillStyle='rgb(100,230,80)'; ctx.font='bold 12px Courier New'; ctx.textAlign='left';

@@ -65,8 +65,23 @@ class Game {
   // ── Audio ─────────────────────────────────────────
   _playBGM() {
     if (!this.sounds.bgm) return;
-    this.sounds.bgm.loop=true; this.sounds.bgm.volume=0.4;
-    this.sounds.bgm.play().catch(()=>{});
+    this.sounds.bgm.loop   = true;
+    this.sounds.bgm.volume = 0.4;
+    // ถ้า AudioContext ยัง suspended (iOS ก่อน interact) → เก็บ pending ไว้
+    const p = this.sounds.bgm.play();
+    if (p !== undefined) {
+      p.catch(() => {
+        // autoplay blocked → mark pending, จะ play เมื่อ user interact
+        this._bgmPending = true;
+      });
+    }
+  }
+
+  // เรียกหลัง user interaction ครั้งแรก เพื่อ resume pending BGM
+  _resumeBGMIfPending() {
+    if (!this._bgmPending) return;
+    this._bgmPending = false;
+    this.sounds.bgm.play().catch(() => {});
   }
   _stopBGM() {
     if (!this.sounds.bgm) return;
@@ -83,6 +98,7 @@ class Game {
     window.addEventListener('keyup',   e => { this.keys[e.key]=false; });
   }
   _handleKeyDown(key) {
+    this._resumeBGMIfPending();   // iOS BGM unlock on first key
     if (this.rankingScreen.visible) return;
     if (this.state===STATE.VICTORY) {
       // ล็อกปุ่มจนกว่า end scene จบและ victoryCanExit = true
@@ -96,6 +112,7 @@ class Game {
     }
   }
   _joyShoot() {
+    this._resumeBGMIfPending();   // iOS BGM unlock on first tap
     if (this.rankingScreen.visible) return;
     if (this.state===STATE.PLAYING||this.state===STATE.BOSS_FIGHT) { this.shootPlayer(); return; }
     if (this.state===STATE.VICTORY) {
@@ -106,6 +123,7 @@ class Game {
     if (this.state===STATE.GAME_OVER) { this._goRanking(); return; }
   }
   _joyBomb() {
+    this._resumeBGMIfPending();
     if (this.rankingScreen.visible) return;
     if (this.state===STATE.PLAYING||this.state===STATE.BOSS_FIGHT) this.shootBomb();
   }
@@ -121,13 +139,24 @@ class Game {
   // ── Restart ───────────────────────────────────────
   restart() {
     this.enemies=[]; this.bullets=[]; this.bbullets=[]; this.ebullets=[]; this.items=[];
+
     this.player     = new Player(this.images);
     this.cage       = new Cage();
     this.boss       = new Boss(this.images);
-    this.friend     = null;
-    this.spawnTimer = 0; this.killed = 0;
-    this.gameTimer  = 0; this.gameTimerActive = true;
-    this.state      = STATE.PLAYING;
+    this.friend     = new Friend(this.images, WIDTH/2, HUD_H + GAME_H/2);
+    this.boss.y     = HUD_H - 150;   // เริ่มนอกจอด้านบน เหมือนรอบแรก
+
+    this.spawnTimer  = 0;
+    this.killed      = 0;
+    this.gameTimer   = 0;
+    this.gameTimerActive = false;
+    this.bonusBreakdown  = null;
+
+    // กลับไป INTRO เหมือนรอบแรก
+    this.introTimer  = 0;
+    this.introPhase  = 0;
+    this.state       = STATE.INTRO;
+
     this._playBGM();
   }
 
@@ -305,6 +334,7 @@ class Game {
       this.friend.y=this.cage.cy-this.friend.h/2;
       if(this.boss.bottom<HUD_H){
         this.boss=new Boss(this.images); this.cage=new Cage(); this.friend=null;
+        this.gameTimer = 0; this.gameTimerActive = true;  // เริ่มจับเวลาเมื่อเข้าเกมจริง
         this.state=STATE.PLAYING;
       }
     }
@@ -333,7 +363,6 @@ class Game {
 
     if     (this.state===STATE.INTRO)      { this.updateIntro(); }
     else if(this.state===STATE.PLAYING)    {
-      this.gameTimerActive = true;
       this.spawnTimer++;
       if(this.spawnTimer>=60){ this.enemies.push(new Enemy(this.images)); this.spawnTimer=0; }
       if(this.killed>=10){ this.state=STATE.BOSS_FIGHT; this._addBossScene(); }

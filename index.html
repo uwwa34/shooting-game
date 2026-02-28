@@ -12,19 +12,15 @@
     html, body {
       width: 100%; height: 100%;
       background: #000;
-      display: flex;
-      justify-content: center;
-      align-items: flex-start;
       overflow: hidden;
-      touch-action: none;       /* block browser scroll / zoom */
+      touch-action: none;
     }
 
     #wrapper {
-      position: relative;
-      /* scale to fit viewport height, keep 390:720 ratio */
+      position: absolute;
       width: 390px;
       height: 720px;
-      transform-origin: top center;
+      transform-origin: top left;   /* scale จาก top-left แล้วเลื่อน position เอง */
     }
 
     canvas {
@@ -95,9 +91,11 @@
     const scaleX  = window.innerWidth  / 390;
     const scaleY  = window.innerHeight / 720;
     const scale   = Math.min(scaleX, scaleY);
+    const offsetX = (window.innerWidth  - 390 * scale) / 2;
+    const offsetY = (window.innerHeight - 720 * scale) / 2;
     wrapper.style.transform = `scale(${scale})`;
-    // centre horizontally
-    wrapper.style.marginLeft = `${(window.innerWidth - 390 * scale) / 2}px`;
+    wrapper.style.left = `${offsetX}px`;
+    wrapper.style.top  = `${offsetY}px`;
   }
   fitScreen();
   window.addEventListener('resize', fitScreen);

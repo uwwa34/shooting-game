@@ -5,11 +5,12 @@ const BOSS_Y = HUD_H + 120;
 
 class Boss {
   constructor(images) {
-    this._canvas  = removeBackground(images.boss, 30);
+    //this._canvas  = removeBackground(images.boss, 30);
+    this._canvas  = images.boss, 30;
     this.w = 170; this.h = 110;
     this.x = WIDTH / 2 - this.w / 2;
     this.y = HUD_H - 130;
-    this.hp = 2500; this.maxHp = 2500;   // ↑ จาก 1000 → 2500
+    this.hp = 3500; this.maxHp = 3500;   // ↑ จาก 1000 → 2500
     this.dir      = 1;
     this.timer    = 0;
     this.phase    = 0;                   // 0-4 (5 patterns)

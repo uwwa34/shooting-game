@@ -102,7 +102,7 @@ class VirtualJoypad {
     const defs = [
       { key: 'left',  label: '◀', sub: 'LEFT',            round: false, bCol: 'rgba(0,200,230,0.8)',  pCol: 'rgba(0,200,230,0.5)'  },
       { key: 'right', label: '▶', sub: 'RIGHT',           round: false, bCol: 'rgba(0,200,230,0.8)',  pCol: 'rgba(0,200,230,0.5)'  },
-      { key: 'bomb',  label: 'B', sub: `BOMB ×${bombsLeft}`, round: true, bCol: 'rgba(255,140,0,0.8)', pCol: 'rgba(255,120,0,0.5)', disabled: bombsLeft <= 0 },
+      { key: 'bomb',  label: 'B', sub: `SPEC ×${bombsLeft}`, round: true, bCol: 'rgba(255,140,0,0.8)', pCol: 'rgba(255,120,0,0.5)', disabled: bombsLeft <= 0 },
       { key: 'shoot', label: 'A', sub: 'SHOOT',           round: true,  bCol: 'rgba(0,200,230,0.8)',  pCol: 'rgba(0,200,230,0.5)'  },
     ];
 

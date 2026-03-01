@@ -24,9 +24,9 @@ const COL = {
 };
 
 const PLAYER_SPEED     = 7;
-const BULLET_SPEED_VAL = 12;
-const SPECIAL_SPEED    = 9;
-const ITEM_SPEED       = 3;
+const BULLET_SPEED_VAL = 7; //12
+const SPECIAL_SPEED    = 10; //9
+const ITEM_SPEED       = 2; //3
 const START_SPECIALS   = 2;
 const MAX_SPECIALS     = 9;
 const MAX_WEAPON_LEVEL = 4;   // Lv1=1shot Lv2=3shot Lv3=6shot Lv4=spread full

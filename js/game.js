@@ -414,7 +414,7 @@ class Game {
     else if(this.state===STATE.PLAYING)    {
       this.spawnTimer++;
       if(this.spawnTimer>=60){ this.enemies.push(new Enemy(this.images)); this.spawnTimer=0; }
-      if(this.killed>=10){ this.state=STATE.BOSS_FIGHT; this._addBossScene(); }
+      if(this.killed>=33){ this.state=STATE.BOSS_FIGHT; this._addBossScene(); }
       this.player.update(this.keys);
     }
     else if(this.state===STATE.BOSS_FIGHT){

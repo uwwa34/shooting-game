@@ -165,6 +165,8 @@
     const canvas = document.getElementById('gameCanvas');
 
     // iOS: resume AudioContext และ BGM pending ทันทีที่ user แตะครั้งแรก
+    let game = null;   // ประกาศก่อน unlockAudio ใช้ได้
+
     function unlockAudio() {
       // resume Web Audio API context ถ้ามี
       if (window.AudioContext || window.webkitAudioContext) {
@@ -180,7 +182,7 @@
     document.addEventListener('touchstart', unlockAudio, { passive: true });
     document.addEventListener('mousedown',  unlockAudio);
 
-    const game = new Game(canvas, images, sounds);
+    game = new Game(canvas, images, sounds);
     game.start();
   }
 })();

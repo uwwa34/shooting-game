@@ -359,36 +359,58 @@ class Game {
   // ── Intro ─────────────────────────────────────────
   updateIntro(){
     this.introTimer++;
-    const t=this.introTimer;
-    if(this.introPhase===0){
-      const target=HUD_H+120;
-      if(this.boss.y<target) this.boss.y+=2;
-      if(t>=150){
-        this.introPhase=1;
-        this.cage.x=this.friend.cx-this.cage.w/2;
-        this.cage.y=this.friend.cy-this.cage.h/2;
-        this.boss.alive=true;
+    const t = this.introTimer;
+
+    // Phase 0: เพื่อนอยู่คนเดียว — บอสซ่อนนอกจอ
+    if (this.introPhase === 0) {
+      this.friend.x = WIDTH/2 - this.friend.w/2;
+      this.friend.y = HUD_H + GAME_H/2 - this.friend.h/2;
+      this.boss.y   = HUD_H - 200;
+      this.cage.alive = false;
+      if (t >= 80) { this.introPhase = 1; }
+
+    // Phase 1: บอสลงมาจากด้านบน มุ่งหาเพื่อน
+    } else if (this.introPhase === 1) {
+      const targetY = this.friend.y - this.boss.h - 10;
+      if (this.boss.y < targetY) { this.boss.y += 4; }
+      else {
+        this.boss.y = targetY;
+        if (t >= 200) {
+          this.introPhase = 2;
+          this.cage.alive = true;
+          // กรงเริ่มจากด้านบนแล้วตกลงมา
+          this.cage.x = this.friend.cx - this.cage.w/2;
+          this.cage.y = HUD_H;
+        }
       }
-    } else if(this.introPhase===1){
-      this.cage.x=this.boss.cx-this.cage.w/2;
-      this.cage.y=this.boss.top-this.cage.h-5;
-      this.friend.x=this.cage.cx-this.friend.w/2;
-      this.friend.y=this.cage.cy-this.friend.h/2;
-      if(t>=270) this.introPhase=2;
+
+    // Phase 2: กรงตกลงมาครอบเพื่อน
+    } else if (this.introPhase === 2) {
+      const cageTargetY = this.friend.y - 10;
+      this.cage.x = this.friend.cx - this.cage.w/2;
+      if (this.cage.y < cageTargetY) {
+        this.cage.y = Math.min(cageTargetY, this.cage.y + 2); //+ 6
+      }
+      this.friend.x = this.cage.cx - this.friend.w/2 + this.cage.struggleOffset();
+      this.friend.y = this.cage.cy - this.friend.h/2;
+      if (t >= 300) { this.introPhase = 3; }
+
+    // Phase 3: บอส+กรง+เพื่อนลอยขึ้นหนี
     } else {
-      this.boss.y-=2;
-      this.cage.x=this.boss.cx-this.cage.w/2;
-      this.cage.y=this.boss.top-this.cage.h-5;
-      this.friend.x=this.cage.cx-this.friend.w/2;
-      this.friend.y=this.cage.cy-this.friend.h/2;
-      if(this.boss.bottom<HUD_H){
-        this.boss=new Boss(this.images); this.cage=new Cage(); this.friend=null;
-        this.gameTimer = 0; this.gameTimerActive = true;  // เริ่มจับเวลาเมื่อเข้าเกมจริง
-        this.state=STATE.PLAYING;
+      this.boss.y -= 3;
+      this.cage.x  = this.boss.cx - this.cage.w/2;
+      this.cage.y  = this.boss.bottom + 5;
+      this.friend.x = this.cage.cx - this.friend.w/2 + this.cage.struggleOffset();
+      this.friend.y = this.cage.cy - this.friend.h/2;
+      if (this.boss.bottom < HUD_H) {
+        this.boss   = new Boss(this.images);
+        this.cage   = new Cage();
+        this.friend = null;
+        this.gameTimer = 0; this.gameTimerActive = true;
+        this.state = STATE.PLAYING;
       }
     }
   }
-
   // ── Victory ───────────────────────────────────────
   updateVictory(){
     if(!this.reachedFriend){
@@ -460,10 +482,13 @@ class Game {
     // ── cage & friend: only in INTRO, BOSS_FIGHT, VICTORY ──
     if ([STATE.INTRO, STATE.BOSS_FIGHT, STATE.VICTORY].includes(this.state)) {
       if (this.friend) this.friend.draw(ctx);
-      this.cage.draw(ctx);
+      if (this.cage.alive) this.cage.draw(ctx);
     }
-
-    if(this.boss.alive) this.boss.draw(ctx);
+    // INTRO: แสดงบอสเฉพาะ phase 1+ (ไม่ให้โผล่ตอน phase 0 ที่เพื่อนอยู่คนเดียว)
+    const showBoss = this.state === STATE.INTRO
+      ? this.introPhase >= 1
+      : this.boss.alive;
+    if (showBoss) this.boss.draw(ctx);
     this.bullets .forEach(o=>o.draw(ctx));
     this.bbullets.forEach(o=>o.draw(ctx));
     this.ebullets.forEach(o=>o.draw(ctx));
@@ -563,9 +588,14 @@ class Game {
 
   _drawIntroCaption(){
     const ctx=this.ctx;
-    // const caps=['A peaceful day with your friend...','The boss has kidnapped your friend!','Go rescue them!'];
-    const caps=['วันนี้อากาศสดใส ออกไปเล่นกับเพื่อนดีกว่า','แย่แล้ว สัตว์ประหลาดจับเพื่อนเราไป!','รีบไปช่วยเพื่อนกัน!'];
-    const cols=['#ffffff','rgb(229, 255, 0)','rgb(0,220,240)'];
+    const caps=[
+      'วันนี้อากาศสดใส ออกไปเล่นกับเพื่อนดีกว่า',   // phase 0: เพื่อนอยู่คนเดียว
+      'เอ้ะ! มีใครมา',                                  // phase 1: บอสลงมา
+      'นั่นสัตว์ประหลาดจับเพื่อนเราไปนี่!',        // phase 2: กรงครอบ
+      'รีบไปช่วยเพื่อนกันเถอะ!',                               // phase 3: บอสหนี
+    ];
+    // const cols=['#ffffff','rgb(255,200,0)','rgb(229,255,0)','rgb(0,220,240)'];
+    const cols=['#ffffff','#ffffff','#ffffff','rgb(0,220,240)'];
     const capY=HUD_H+GAME_H-42;
     ctx.fillStyle='rgba(0,0,0,0.55)'; ctx.fillRect(0,capY,WIDTH,34);
     ctx.fillStyle=cols[this.introPhase]; ctx.font='bold 20px Arial';

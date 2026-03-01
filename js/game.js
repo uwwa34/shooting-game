@@ -32,6 +32,8 @@ class Game {
     this.victoryTimer   = 0;
     this.victoryCanExit = false;
     this.reachedFriend  = false;
+    this.gameOverTimer  = 0;
+    this.gameOverReady  = false;
 
     // Ranking
     this.rankingScreen = new RankingScreen(canvas);
@@ -88,8 +90,18 @@ class Game {
     this.sounds.bgm.pause(); this.sounds.bgm.currentTime=0;
   }
   _play(key) {
-    const s=this.sounds[key]; if(!s) return;
-    const c=s.cloneNode(); c.volume=0.6; c.play().catch(()=>{});
+    const s = this.sounds[key]; if (!s) return;
+    // Audio pool: reuse existing Audio ถ้า paused อยู่ หรือ clone สูงสุด 4 ตัว
+    if (!this._audioPool) this._audioPool = {};
+    if (!this._audioPool[key]) this._audioPool[key] = [];
+    const pool = this._audioPool[key];
+    let node = pool.find(n => n.paused || n.ended);
+    if (!node) {
+      if (pool.length < 4) { node = s.cloneNode(); node.volume = 0.6; pool.push(node); }
+      else { node = pool[0]; }  // reuse oldest
+    }
+    node.currentTime = 0;
+    node.play().catch(() => {});
   }
 
   // ── Keys ──────────────────────────────────────────
@@ -105,7 +117,10 @@ class Game {
       if (this.victoryCanExit) { this._goRanking(); }
       return;
     }
-    if (this.state===STATE.GAME_OVER) { this._goRanking(); return; }
+    if (this.state===STATE.GAME_OVER) {
+      if (this.gameOverReady) { this._goRanking(); }
+      return;
+    }
     if (this.state===STATE.PLAYING||this.state===STATE.BOSS_FIGHT) {
       if (key===' ') this.shootPlayer();
       if (key==='b'||key==='B') this.shootBomb();
@@ -116,11 +131,13 @@ class Game {
     if (this.rankingScreen.visible) return;
     if (this.state===STATE.PLAYING||this.state===STATE.BOSS_FIGHT) { this.shootPlayer(); return; }
     if (this.state===STATE.VICTORY) {
-      // ล็อกจนกว่า victoryCanExit
       if (this.victoryCanExit) { this._goRanking(); }
       return;
     }
-    if (this.state===STATE.GAME_OVER) { this._goRanking(); return; }
+    if (this.state===STATE.GAME_OVER) {
+      if (this.gameOverReady) { this._goRanking(); }
+      return;
+    }
   }
   _joyBomb() {
     this._resumeBGMIfPending();
@@ -151,6 +168,8 @@ class Game {
     this.gameTimer   = 0;
     this.gameTimerActive = false;
     this.bonusBreakdown  = null;
+    this.gameOverTimer   = 0;
+    this.gameOverReady   = false;
 
     // กลับไป INTRO เหมือนรอบแรก
     this.introTimer  = 0;
@@ -208,68 +227,98 @@ class Game {
   _overlap(a,b){ return a.x<b.x+b.w&&a.x+a.w>b.x&&a.y<b.y+b.h&&a.y+a.h>b.y; }
 
   handleCollisions() {
-    const pR=this.player.getRect();
-    // normal bullets → enemies
-    this.bullets=this.bullets.filter(b=>{
-      if(!b.alive) return false;
-      let hit=false;
-      this.enemies=this.enemies.filter(e=>{
-        if(!e.alive||!this._overlap(b.getRect(),e.getRect())) return true;
-        this.player.score+=10; this.killed++;
-        this._maybeDrop(e.cx,e.cy); b.alive=false; hit=true; return false;
-      });
-      return !hit;
-    });
-    // bomb bullets → enemies (pass-through)
-    this.bbullets.forEach(b=>{
-      if(!b.alive) return;
-      this.enemies=this.enemies.filter(e=>{
-        if(!e.alive||!this._overlap(b.getRect(),e.getRect())) return true;
-        this.player.score+=15; this.killed++; this._maybeDrop(e.cx,e.cy); return false;
-      });
-    });
-    // bullets → boss
-    if (this.state===STATE.BOSS_FIGHT&&this.boss.alive) {
-      const bR=this.boss.getRect();
-      this.bullets=this.bullets.filter(b=>{
-        if(!b.alive||!this._overlap(b.getRect(),bR)) return true;
-        this.boss.hp-=20; b.alive=false; this._checkBossDead(); return false;
-      });
-      this.bbullets=this.bbullets.filter(b=>{
-        if(!b.alive||!this._overlap(b.getRect(),bR)) return true;
-        this.boss.hp-=250; b.alive=false; this._checkBossDead(); return false;
-      });
+    const pR  = this.player.getRect();
+    const bossInFight = this.state === STATE.BOSS_FIGHT && this.boss.alive;
+    const bossR = bossInFight ? this.boss.getRect() : null;
+
+    // ── วน enemies หนึ่งรอบ: เช็ค bullets, bbullets, player พร้อมกัน ──
+    const inPlay = ![STATE.VICTORY, STATE.INTRO, STATE.GAME_OVER].includes(this.state);
+    let playerHit = false;
+
+    for (let ei = this.enemies.length - 1; ei >= 0; ei--) {
+      const e = this.enemies[ei];
+      if (!e.alive) continue;
+      const eR = e.getRect();
+
+      // bullet → enemy
+      let killed = false;
+      for (let bi = this.bullets.length - 1; bi >= 0; bi--) {
+        const b = this.bullets[bi];
+        if (!b.alive) continue;
+        if (this._overlap(b.getRect(), eR)) {
+          b.alive = false; e.alive = false; killed = true;
+          this.player.score += 10; this.killed++;
+          this._maybeDrop(e.cx, e.cy); break;
+        }
+      }
+      if (killed) continue;
+
+      // bbullet → enemy (pass-through)
+      for (let bi = 0; bi < this.bbullets.length; bi++) {
+        const b = this.bbullets[bi];
+        if (!b.alive) continue;
+        if (this._overlap(b.getRect(), eR)) {
+          e.alive = false; killed = true;
+          this.player.score += 15; this.killed++;
+          this._maybeDrop(e.cx, e.cy); break;
+        }
+      }
+      if (killed) continue;
+
+      // enemy → player
+      if (inPlay && this._overlap(eR, pR)) {
+        e.alive = false; playerHit = true;
+      }
     }
-    // enemy/ebullets → player
-    if (![STATE.VICTORY,STATE.INTRO,STATE.GAME_OVER].includes(this.state)) {
-      let hit=false;
-      this.enemies=this.enemies.filter(e=>{
-        if(e.alive&&this._overlap(e.getRect(),pR)){hit=true;return false;} return true;
-      });
-      this.ebullets=this.ebullets.filter(b=>{
-        if(b.alive&&this._overlap(b.getRect(),pR)){hit=true;b.alive=false;return false;} return true;
-      });
-      if(hit){
-        this._play('hit');
-        if(this.player.shieldHp>0) this.player.shieldHp-=20;
-        else this.player.hp-=10;
-        if(this.player.hp<=0){
-          this._play('explode'); this.state=STATE.GAME_OVER;
-          this.gameTimerActive = false;
-          this._stopBGM();
+
+    // ── bullets → boss ──
+    if (bossInFight) {
+      for (let bi = this.bullets.length - 1; bi >= 0; bi--) {
+        const b = this.bullets[bi];
+        if (!b.alive) continue;
+        if (this._overlap(b.getRect(), bossR)) {
+          b.alive = false; this.boss.hp -= 20; this._checkBossDead();
+        }
+      }
+      for (let bi = this.bbullets.length - 1; bi >= 0; bi--) {
+        const b = this.bbullets[bi];
+        if (!b.alive) continue;
+        if (this._overlap(b.getRect(), bossR)) {
+          b.alive = false; this.boss.hp -= 250; this._checkBossDead();
         }
       }
     }
-    // items → player
-    this.items=this.items.filter(it=>{
-      if(!it.alive||!this._overlap(it.getRect(),pR)) return it.alive;
-      this._play('item');
-      if(it.type==='life')   this.player.hp=Math.min(100,this.player.hp+20);
-      if(it.type==='shield') { this.player.shieldHp=100; this.player.shieldTimer=600; }
-      if(it.type==='special')   this.player.specials=Math.min(MAX_SPECIALS,this.player.specials+1);
-      if(it.type==='weapon'&&this.player.weaponLevel<MAX_WEAPON_LEVEL) this.player.weaponLevel++;
-      return false;
-    });
+
+    // ── ebullets → player ──
+    if (inPlay) {
+      for (let bi = this.ebullets.length - 1; bi >= 0; bi--) {
+        const b = this.ebullets[bi];
+        if (b.alive && this._overlap(b.getRect(), pR)) {
+          b.alive = false; playerHit = true;
+        }
+      }
+    }
+
+    if (playerHit) {
+      this._play('hit');
+      if (this.player.shieldHp > 0) this.player.shieldHp -= 20;
+      else this.player.hp -= 10;
+      if (this.player.hp <= 0) {
+        this._play('explode'); this.state = STATE.GAME_OVER;
+        this.gameTimerActive = false; this._stopBGM();
+      }
+    }
+
+    // ── items → player ──
+    for (let ii = this.items.length - 1; ii >= 0; ii--) {
+      const it = this.items[ii];
+      if (!it.alive || !this._overlap(it.getRect(), pR)) continue;
+      this._play('item'); it.alive = false;
+      if (it.type==='life')    this.player.hp = Math.min(100, this.player.hp + 20);
+      if (it.type==='shield')  { this.player.shieldHp = 100; this.player.shieldTimer = 600; }
+      if (it.type==='special') this.player.specials = Math.min(MAX_SPECIALS, this.player.specials + 1);
+      if (it.type==='weapon' && this.player.weaponLevel < MAX_WEAPON_LEVEL) this.player.weaponLevel++;
+    }
   }
 
   _maybeDrop(x,y){
@@ -365,7 +414,7 @@ class Game {
     else if(this.state===STATE.PLAYING)    {
       this.spawnTimer++;
       if(this.spawnTimer>=60){ this.enemies.push(new Enemy(this.images)); this.spawnTimer=0; }
-      if(this.killed>=30){ this.state=STATE.BOSS_FIGHT; this._addBossScene(); }
+      if(this.killed>=10){ this.state=STATE.BOSS_FIGHT; this._addBossScene(); }
       this.player.update(this.keys);
     }
     else if(this.state===STATE.BOSS_FIGHT){
@@ -376,6 +425,10 @@ class Game {
       this.player.update(this.keys);
     }
     else if(this.state===STATE.VICTORY)   { this.updateVictory(); this.cage.update(); }
+    else if(this.state===STATE.GAME_OVER) {
+      this.gameOverTimer++;
+      if (this.gameOverTimer >= FPS * 2) this.gameOverReady = true;  // 2 วินาที
+    }
 
     if (this.gameTimerActive) this.gameTimer++;
 
@@ -512,7 +565,7 @@ class Game {
     const ctx=this.ctx;
     // const caps=['A peaceful day with your friend...','The boss has kidnapped your friend!','Go rescue them!'];
     const caps=['วันนี้อากาศสดใส ออกไปเล่นกับเพื่อนดีกว่า','แต่ว่ามีสัตว์ประหลาดมาจับเพื่อนเราไป!','ไปช่วยเพื่อนกัน!'];
-    const cols=['#ffffff','rgb(255, 251, 0)','rgb(0,220,240)'];
+    const cols=['#ffffff','rgb(229, 255, 0)','rgb(0,220,240)'];
     const capY=HUD_H+GAME_H-42;
     ctx.fillStyle='rgba(0,0,0,0.55)'; ctx.fillRect(0,capY,WIDTH,34);
     ctx.fillStyle=cols[this.introPhase]; ctx.font='bold 20px Arial';
@@ -588,20 +641,38 @@ class Game {
   }
 
   _drawGameOver(){
-    const ctx=this.ctx;
-    ctx.fillStyle='rgba(0,0,0,0.67)'; ctx.fillRect(0,0,WIDTH,HEIGHT);
-    ctx.fillStyle='rgb(220,40,60)'; ctx.font='bold 34px Arial';
-    ctx.textAlign='center'; ctx.textBaseline='middle';
-    ctx.fillText('GAME OVER',WIDTH/2,HEIGHT/2-60);
-    ctx.fillStyle=COL.YELLOW; ctx.font='bold 24px Courier New';
-    ctx.fillText(`SCORE: ${String(this.player.score).padStart(6,'0')}`,WIDTH/2,HEIGHT/2-10);
+    const ctx = this.ctx;
+    const t   = this.gameOverTimer;
+    ctx.fillStyle = 'rgba(0,0,0,0.75)'; ctx.fillRect(0,0,WIDTH,HEIGHT);
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
 
-    // single button
-    const bx=WIDTH/2-110, by=HEIGHT/2+30, bw=220, bh=50;
-    ctx.fillStyle='rgba(0,200,230,0.2)'; ctx.strokeStyle=COL.CYAN; ctx.lineWidth=2;
-    this._rr(ctx,bx,by,bw,bh,10,true,true);
-    ctx.fillStyle=COL.CYAN; ctx.font='bold 20px Arial';
-    ctx.fillText('TAP SHOOT TO PLAY',WIDTH/2,by+bh/2);
+    // "GAME OVER" fade in ทันที
+    if (t >= 10) {
+      ctx.globalAlpha = Math.min(1, (t-10) / 20);
+      ctx.fillStyle = 'rgb(220,40,60)'; ctx.font = 'bold 40px Arial';
+      ctx.fillText('GAME OVER', WIDTH/2, HEIGHT/2 - 70);
+      ctx.globalAlpha = 1;
+    }
+
+    // Score — โผล่หลัง 30 frames
+    if (t >= 30) {
+      ctx.globalAlpha = Math.min(1, (t-30) / 20);
+      ctx.fillStyle = COL.YELLOW; ctx.font = 'bold 24px Courier New';
+      ctx.fillText('SCORE: ' + String(this.player.score).padStart(6,'0'), WIDTH/2, HEIGHT/2 - 10);
+      ctx.globalAlpha = 1;
+    }
+
+    // ปุ่ม — โผล่เมื่อ gameOverReady (2 วินาที) พร้อม pulse
+    if (this.gameOverReady) {
+      const pulse = 0.7 + 0.3 * Math.sin(Date.now() * 0.005);
+      const bx = WIDTH/2-110, by = HEIGHT/2+30, bw = 220, bh = 50;
+      ctx.globalAlpha = pulse;
+      ctx.fillStyle = 'rgba(0,200,230,0.2)'; ctx.strokeStyle = COL.CYAN; ctx.lineWidth = 2;
+      this._rr(ctx, bx, by, bw, bh, 10, true, true);
+      ctx.fillStyle = COL.CYAN; ctx.font = 'bold 20px Arial';
+      ctx.fillText('TAP SHOOT TO PLAY', WIDTH/2, by+bh/2);
+      ctx.globalAlpha = 1;
+    }
   }
 
   // ── Main loop ─────────────────────────────────────

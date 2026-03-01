@@ -108,24 +108,22 @@ class Boss {
   draw(ctx) {
     if (!this.alive) return;
     ctx.save();
-    // rage: กระพริบสีแดง
-    if (this._rage && Math.floor(Date.now()/200)%2===0) {
-      ctx.filter = 'hue-rotate(120deg) saturate(3) brightness(1.3)';
+    if (this._rage && Math.floor(Date.now() / 200) % 2 === 0) {
+      // วาด red tint บน offscreen canvas ก่อน — composite เฉพาะพิกเซลที่มีรูป ไม่มีกรอบ
+      const oc = Boss._rageTintCanvas || (Boss._rageTintCanvas = document.createElement('canvas'));
+      if (oc.width !== this.w || oc.height !== this.h) { oc.width = this.w; oc.height = this.h; }
+      const c2 = oc.getContext('2d');
+      c2.clearRect(0, 0, this.w, this.h);
+      c2.drawImage(this._canvas, 0, 0, this.w, this.h);
+      c2.globalCompositeOperation = 'source-atop';
+      c2.fillStyle = 'rgba(255,0,0,0.6)';
+      c2.fillRect(0, 0, this.w, this.h);
+      c2.globalCompositeOperation = 'source-over';
+      ctx.drawImage(oc, this.x, this.y, this.w, this.h);
+    } else {
+      ctx.drawImage(this._canvas, this.x, this.y, this.w, this.h);
     }
-    ctx.drawImage(this._canvas, this.x, this.y, this.w, this.h);
     ctx.restore();
-
-    // // rage warning aura
-    // if (this._rage) {
-    //   ctx.save();
-    //   const pulse = 0.5 + 0.5*Math.sin(Date.now()*0.008);
-    //   ctx.strokeStyle = `rgba(255,40,40,${0.5*pulse})`;
-    //   ctx.lineWidth   = 6;
-    //   ctx.shadowColor = 'rgba(255,0,0,0.8)';
-    //   ctx.shadowBlur  = 20;
-    //   ctx.strokeRect(this.x-4, this.y-4, this.w+8, this.h+8);
-    //   ctx.restore();
-    // }
   }
 
   getRect() { return { x:this.x, y:this.y, w:this.w, h:this.h }; }

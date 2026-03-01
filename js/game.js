@@ -512,7 +512,7 @@ class Game {
     const ctx=this.ctx;
     // const caps=['A peaceful day with your friend...','The boss has kidnapped your friend!','Go rescue them!'];
     const caps=['วันนี้อากาศสดใส ออกไปเล่นกับเพื่อนดีกว่า','แต่ว่ามีสัตว์ประหลาดมาจับเพื่อนเราไป!','ไปช่วยเพื่อนกัน!'];
-    const cols=['#ffffff','rgb(250, 8, 37)','rgb(0,220,240)'];
+    const cols=['#ffffff','rgb(255, 251, 0)','rgb(0,220,240)'];
     const capY=HUD_H+GAME_H-42;
     ctx.fillStyle='rgba(0,0,0,0.55)'; ctx.fillRect(0,capY,WIDTH,34);
     ctx.fillStyle=cols[this.introPhase]; ctx.font='bold 20px Arial';

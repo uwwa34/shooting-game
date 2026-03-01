@@ -37,29 +37,16 @@ class Game {
 
     // Ranking
     this.rankingScreen = new RankingScreen(canvas);
+    this.specialType   = ACTIVE_SPECIAL;  // กำหนดจาก settings.js
 
     this.keys   = {};
     this.joypad = new VirtualJoypad(canvas);
     this.joypad._onShoot = () => this._joyShoot();
     this.joypad._onBomb  = () => this._joyBomb();
 
-    // tap detection for ranking screen
-    canvas.addEventListener('touchstart', e => {
-      if (!this.rankingScreen.visible) return;
-      e.preventDefault();
-      const r = canvas.getBoundingClientRect();
-      const t = e.changedTouches[0];
-      const scX = WIDTH  / r.width;
-      const scY = HEIGHT / r.height;
-      this.rankingScreen.handleTap((t.clientX-r.left)*scX, (t.clientY-r.top)*scY);
-    }, { passive:false });
-    canvas.addEventListener('mousedown', e => {
-      if (!this.rankingScreen.visible) return;
-      const r  = canvas.getBoundingClientRect();
-      const scX = WIDTH/r.width, scY = HEIGHT/r.height;
-      this.rankingScreen.handleTap((e.clientX-r.left)*scX, (e.clientY-r.top)*scY);
-    });
 
+
+    this._bindRankingTap(canvas);
     this._bindKeys();
     this._playBGM();
   }
@@ -105,20 +92,36 @@ class Game {
   }
 
   // ── Keys ──────────────────────────────────────────
+  _bindRankingTap(canvas) {
+    const toCanvas = (clientX, clientY) => {
+      const r = canvas.getBoundingClientRect();
+      return [(clientX-r.left)*WIDTH/r.width, (clientY-r.top)*HEIGHT/r.height];
+    };
+    canvas.addEventListener('touchstart', e => {
+      if (!this.rankingScreen.visible) return;
+      e.preventDefault();
+      const [x,y] = toCanvas(e.changedTouches[0].clientX, e.changedTouches[0].clientY);
+      this.rankingScreen.handleTap(x, y);
+    }, { passive: false });
+    canvas.addEventListener('mousedown', e => {
+      if (!this.rankingScreen.visible) return;
+      const [x,y] = toCanvas(e.clientX, e.clientY);
+      this.rankingScreen.handleTap(x, y);
+    });
+  }
+
   _bindKeys() {
     window.addEventListener('keydown', e => { this.keys[e.key]=true; this._handleKeyDown(e.key); });
     window.addEventListener('keyup',   e => { this.keys[e.key]=false; });
   }
   _handleKeyDown(key) {
     this._resumeBGMIfPending();   // iOS BGM unlock on first key
-    if (this.rankingScreen.visible) return;
     if (this.state===STATE.VICTORY) {
-      // ล็อกปุ่มจนกว่า end scene จบและ victoryCanExit = true
-      if (this.victoryCanExit) { this._goRanking(); }
+      if (this.victoryCanExit) { this.victoryCanExit = false; this._goRanking(); }
       return;
     }
     if (this.state===STATE.GAME_OVER) {
-      if (this.gameOverReady) { this._goRanking(); }
+      if (this.gameOverReady) { this.restart(); }  // Game Over → restart ตรงๆ
       return;
     }
     if (this.state===STATE.PLAYING||this.state===STATE.BOSS_FIGHT) {
@@ -128,33 +131,40 @@ class Game {
   }
   _joyShoot() {
     this._resumeBGMIfPending();   // iOS BGM unlock on first tap
-    if (this.rankingScreen.visible) return;
     if (this.state===STATE.PLAYING||this.state===STATE.BOSS_FIGHT) { this.shootPlayer(); return; }
     if (this.state===STATE.VICTORY) {
-      if (this.victoryCanExit) { this._goRanking(); }
+      if (this.victoryCanExit) { this.victoryCanExit = false; this._goRanking(); }
       return;
     }
     if (this.state===STATE.GAME_OVER) {
-      if (this.gameOverReady) { this._goRanking(); }
+      if (this.gameOverReady) { this.restart(); }  // Game Over → restart ตรงๆ
       return;
     }
   }
   _joyBomb() {
     this._resumeBGMIfPending();
-    if (this.rankingScreen.visible) return;
     if (this.state===STATE.PLAYING||this.state===STATE.BOSS_FIGHT) this.shootBomb();
   }
 
   // ── Ranking transition ────────────────────────────
+  _startPlaying() {
+    // specialType ถูกกำหนดจาก ACTIVE_SPECIAL ใน settings.js แล้ว
+    this.specialType = ACTIVE_SPECIAL;
+    this.state = STATE.PLAYING;
+    this.spawnTimer = 0;
+    this.killed = 0;
+    this.gameTimer = 0;
+    this.gameTimerActive = true;
+  }
+
   _goRanking() {
-    this.rankingScreen.show(this.player.score, () => {
-      // Done → restart
-      this.restart();
-    });
+    if (this.rankingScreen.visible) return;  // ป้องกันเรียกซ้ำ
+    this.rankingScreen.show(this.player.score, () => { this.restart(); });
   }
 
   // ── Restart ───────────────────────────────────────
   restart() {
+    this.rankingScreen.hide();  // ensure ranking is closed before restart
     this.enemies=[]; this.bullets=[]; this.bbullets=[]; this.ebullets=[]; this.items=[];
 
     this.player     = new Player(this.images);
@@ -175,6 +185,7 @@ class Game {
     this.introTimer  = 0;
     this.introPhase  = 0;
     this.state       = STATE.INTRO;
+    this.specialType = ACTIVE_SPECIAL;
 
     this._playBGM();
   }
@@ -216,7 +227,12 @@ class Game {
     if (this.player.specials<=0) return;
     this.player.specials--;
     this._play('explode');
-    this.bbullets.push(new SpecialBullet(this.player.cx, this.player.top));
+    const newBullets = createSpecial(
+      this.specialType,
+      this.player.cx, this.player.top,
+      this.player, this.enemies
+    );
+    newBullets.forEach(b => this.bbullets.push(b));
   }
   shootBoss() {
     this._play('bShoot');
@@ -285,6 +301,18 @@ class Game {
         if (!b.alive) continue;
         if (this._overlap(b.getRect(), bossR)) {
           b.alive = false; this.boss.hp -= 250; this._checkBossDead();
+        }
+      }
+    }
+
+    // ── Barrier absorbs ebullets ──
+    const barrier = this.bbullets.find(b=>b instanceof SpecialBarrier && b.alive);
+    if (barrier) {
+      const bR = barrier.getRect();
+      for (let bi = this.ebullets.length-1; bi>=0; bi--) {
+        const b = this.ebullets[bi];
+        if (b.alive && this._overlap(b.getRect(), bR)) {
+          b.alive = false; barrier.onHit();
         }
       }
     }
@@ -406,8 +434,7 @@ class Game {
         this.boss   = new Boss(this.images);
         this.cage   = new Cage();
         this.friend = null;
-        this.gameTimer = 0; this.gameTimerActive = true;
-        this.state = STATE.PLAYING;
+        this._startPlaying();  // เริ่มเล่นทันที ใช้ ACTIVE_SPECIAL
       }
     }
   }
@@ -427,7 +454,6 @@ class Game {
 
   // ── Update ────────────────────────────────────────
   update(){
-    if(this.rankingScreen.visible) return;  // pause game while ranking shown
 
     this.player.padLeft  = this.joypad.state.left;
     this.player.padRight = this.joypad.state.right;
@@ -460,6 +486,7 @@ class Game {
     this.ebullets = this.ebullets.filter(o=>{o.update();return o.alive;});
     this.items    = this.items   .filter(o=>{o.update();return o.alive;});
 
+    if (this.rankingScreen.visible) return;  // pause while ranking shown
     if(this.state===STATE.PLAYING||this.state===STATE.BOSS_FIGHT) this.handleCollisions();
   }
 
@@ -500,7 +527,7 @@ class Game {
     if(this.state===STATE.BOSS_FIGHT&&this.boss.alive) this._drawBossHP();
 
     // Joypad only when not in ranking
-    if(!this.rankingScreen.visible) this.joypad.draw(ctx, this.player.specials);
+    if (!this.rankingScreen.visible) this.joypad.draw(ctx, this.player.specials);
 
     if(this.state===STATE.INTRO)     this._drawIntroCaption();
     if(this.state===STATE.VICTORY)   this._drawVictory();
@@ -540,8 +567,9 @@ class Game {
     }
 
     // Bomb dots
-    ctx.fillStyle='rgb(255,140,0)'; ctx.font='bold 12px Courier New'; ctx.textAlign='left';
-    ctx.fillText('SPEC',WIDTH-90,8);
+    const _spCfg = SPECIALS_CONFIG.find(c=>c.id===this.specialType);
+    ctx.fillStyle=(_spCfg?_spCfg.color:'rgb(255,140,0)'); ctx.font='bold 11px Courier New'; ctx.textAlign='left';
+    ctx.fillText(_spCfg?_spCfg.name.slice(0,6):'SPEC',WIDTH-90,8);
     for(let i=0;i<Math.min(this.player.specials,9);i++){
       const cx=WIDTH-85+i*14;
       ctx.fillStyle='rgb(255,120,0)';
@@ -590,8 +618,8 @@ class Game {
     const ctx=this.ctx;
     const caps=[
       'วันนี้อากาศสดใส ออกไปเล่นกับเพื่อนดีกว่า',   // phase 0: เพื่อนอยู่คนเดียว
-      'เอ้ะ! มีใครมา',                                  // phase 1: บอสลงมา
-      'นั่นสัตว์ประหลาดจับเพื่อนเราไปนี่!',        // phase 2: กรงครอบ
+      'เอ้ะ! นั่นใครน่ะ',                                  // phase 1: บอสลงมา
+      'เจ้าสัตว์ประหลาดจับเพื่อนเราไปนี่!!!',        // phase 2: กรงครอบ
       'รีบไปช่วยเพื่อนกันเถอะ!',                               // phase 3: บอสหนี
     ];
     // const cols=['#ffffff','rgb(255,200,0)','rgb(229,255,0)','rgb(0,220,240)'];
@@ -666,7 +694,7 @@ class Game {
     // ── Tap hint ──
     if (this.victoryCanExit) {
       ctx.fillStyle='rgba(255,255,255,0.8)'; ctx.font='16px Arial'; ctx.textAlign='center';
-      ctx.fillText('Tap SHOOT for Ranking', WIDTH/2, midY+130);
+      ctx.fillText('Tap SHOOT to Play Again', WIDTH/2, midY+130);
     }
   }
 
@@ -700,7 +728,7 @@ class Game {
       ctx.fillStyle = 'rgba(0,200,230,0.2)'; ctx.strokeStyle = COL.CYAN; ctx.lineWidth = 2;
       this._rr(ctx, bx, by, bw, bh, 10, true, true);
       ctx.fillStyle = COL.CYAN; ctx.font = 'bold 20px Arial';
-      ctx.fillText('TAP SHOOT TO PLAY', WIDTH/2, by+bh/2);
+      ctx.fillText('TAP TO PLAY AGAIN', WIDTH/2, by+bh/2);
       ctx.globalAlpha = 1;
     }
   }

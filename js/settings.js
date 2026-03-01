@@ -31,13 +31,27 @@ const START_SPECIALS   = 2;
 const MAX_SPECIALS     = 9;
 const MAX_WEAPON_LEVEL = 4;   // Lv1=1shot Lv2=3shot Lv3=6shot Lv4=spread full
 
+// ─────────────────────────────────────────────────────
+//  🎮 ACTIVE_SPECIAL — เลือก Special ของเด็กคนนี้
+//  เปลี่ยนค่าเพื่อ fix อาวุธพิเศษที่ต้องการ
+//
+//  'flame'    = 🔥 Flame Burst   (ยิง 12 นัดกระจาย 180°)
+//  'thunder'  = ⚡ Thunder Strike (สายฟ้าล็อคศัตรูอัตโนมัติ)
+//  'tornado'  = 🌀 Tornado        (วนรอบตัวแล้วพุ่งออก)
+//  'bigbomb'  = 💣 Big Bomb       (ระเบิดพื้นที่วงกว้าง)
+//  'starrain' = 🌟 Star Rain      (ดาวตก 8 ดวงจากด้านบน)
+//  'barrier'  = 🛡️ Barrier        (กำแพงดูดซับกระสุนบอส)
+//  'laser'    = 🎯 Laser          (เลเซอร์ทะลุตลอดจอ)
+//  'wave'     = 🌊 Wave Bomb      (คลื่นระเบิดแผ่รอบตัว)
+// ─────────────────────────────────────────────────────
+const ACTIVE_SPECIAL = 'flame';
+
 const STATE = {
   INTRO      : 'intro',
   PLAYING    : 'playing',
   BOSS_FIGHT : 'boss_fight',
   VICTORY    : 'victory',
   GAME_OVER  : 'game_over',
-  RANKING    : 'ranking',
 };
 
 const IMG = {
@@ -50,8 +64,17 @@ const IMG = {
   // Item sprites
   ITEM_LIFE    : 'assets/images/items/item_life.png',
   ITEM_SHIELD  : 'assets/images/items/item_shield.png',
-  ITEM_SPECIAL : 'assets/images/items/item_special.png',   // เปลี่ยนจาก bomb
+  ITEM_SPECIAL : 'assets/images/items/item_special.png',
   ITEM_WEAPON  : 'assets/images/items/item_weapon.png',
+  // Special weapon icons
+  SPECIAL_FLAME    : 'assets/images/specials/special_flame.png',
+  SPECIAL_THUNDER  : 'assets/images/specials/special_thunder.png',
+  SPECIAL_TORNADO  : 'assets/images/specials/special_tornado.png',
+  SPECIAL_BIGBOMB  : 'assets/images/specials/special_bigbomb.png',
+  SPECIAL_STARRAIN : 'assets/images/specials/special_starrain.png',
+  SPECIAL_BARRIER  : 'assets/images/specials/special_barrier.png',
+  SPECIAL_LASER    : 'assets/images/specials/special_laser.png',
+  SPECIAL_WAVE     : 'assets/images/specials/special_wave.png',
 };
 
 const SND = {
